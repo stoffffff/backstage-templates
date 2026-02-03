@@ -1,0 +1,83 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: nodejs-template
+  title: nodejs-template
+  description: Creates a new GitHub repo from a nodejs skeleton and registers it in Backstage.
+spec:
+  owner: platform-engineering
+  type: service
+
+  # 1. Inputs: What the developer sees in the UI form
+  parameters:
+    - title: Provide Repository Information
+      required:
+        - repoName
+        - owner
+      properties:
+        repoName:
+          title: Name
+          type: string
+          description: The name of the new repository.
+        description:
+          title: Description
+          type: string
+          description: A short description of the project.
+        owner:
+          title: Owner
+          type: string
+          description: The group or user responsible for this component.
+          ui:field: OwnerPicker
+          ui:options:
+            allowedKinds: [Group]
+
+    - title: Choose Location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+  # 2. Steps: The actual automation logic
+  steps:
+    # Fetch the skeleton from your source GitHub repo
+    - id: fetch-base
+      name: Fetching Skeleton
+      action: fetch:template
+      input:
+        url: https://github.com/stoffffff/backstage-nodejs 
+        values:
+          name: ${{ parameters.repoName }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+
+    # Publish the code to a new GitHub Repository
+    - id: publish
+      name: Creating GitHub Repo
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: ${{ parameters.description }}
+        repoUrl: ${{ parameters.repoUrl }}
+
+    # Automatically register the new component in the Backstage Catalog
+    - id: register
+      name: Registering in Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.remoteUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  # 3. Outputs: Links shown to the developer after completion
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: Open in Catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
